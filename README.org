@@ -1,0 +1,59 @@
+* =emacs-audit=
+
+[[resources/emacs_audit_demo.gif][file:resources/emacs_audit_demo.gif]]
+
+** Features
+   - List all installed packages showing:
+     - License
+     - Melpa download counts
+     - Github license, stars, and forks
+   - ... and more to come
+
+** Install
+*** From Melpa
+    =emacs-audit= is available from Melpa and Melpa-Stable. If you haven’t used
+    Emacs’ package manager before, then it is high time you familiarize yourself
+    with it by reading the documentation in the Emacs manual, see
+    (emacs)Packages. Then add one of the archives to package-archives:
+
+    To use Melpa:
+    #+begin_src emacs-lisp
+    (require 'package)
+    (add-to-list 'package-archives
+                 '("melpa" . "http://melpa.org/packages/") t)
+    #+end_src
+    To use Melpa-Stable:
+    #+begin_src emacs-lisp
+    (require 'package)
+    (add-to-list 'package-archives
+                 '("melpa-stable" . "http://stable.melpa.org/packages/") t)
+    #+end_src
+
+    Once you have added your preferred archive, you need to update the local
+    package list using:
+
+    =M-x package-refresh-contents RET=
+
+    Once you have done that, you can install =emacs-audit= and its dependencies
+    using:
+
+    =M-x package-install RET emacs-audit RET=
+
+** Usage
+   =M-x emacs-audit-list-packages RET=
+
+** License
+   #+begin_src text
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+   #+end_src
