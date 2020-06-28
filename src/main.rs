@@ -46,8 +46,7 @@ fn build_repository_provider_url(
 
 fn repository_url_or_error(repository_url: &Option<Url>) -> Result<Url> {
     repository_url.clone().ok_or(anyhow!(
-        "couldn't fallback to empty 'url' field to build \
-                 MELPA recipe URL"
+        "couldn't fallback to empty 'url' field to build recipe URL"
     ))
 }
 
@@ -60,8 +59,8 @@ impl MelpaRecipe {
             "gitlab" => {
                 build_repository_provider_url("https://gitlab.com", &self.repo)
             }
-            "hg" => repository_url_or_error(&self.url),
             "git" => repository_url_or_error(&self.url),
+            "hg" => repository_url_or_error(&self.url),
             fetcher => {
                 Err(anyhow!("don't know how to build URL for {}", fetcher))
             }
