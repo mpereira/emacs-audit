@@ -4,9 +4,17 @@
 
 ** Features
    - List all installed packages showing:
-     - License
+     - Licenses
      - Melpa download counts
-     - Github license, stars, and forks
+     - Github repository
+       - Creation date
+       - Last commit date
+       - Licenses
+       - Stars
+       - Forks
+       - Issues
+       - Pull requests
+       - Vulnerability alerts
    - ... and more to come
 
 ** Install

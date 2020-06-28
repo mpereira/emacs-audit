@@ -205,9 +205,15 @@
                   ("Version" 15 t)
                   ("License" 15 t)
                   ("GH license" 40 t)
-                  ("Melpa downloads" 15 ,(emacs-audit--tabulated-list-number-sort-fn 4))
-                  ("GH Stars" 8 ,(emacs-audit--tabulated-list-number-sort-fn 5))
-                  ("GH Forks" 8 ,(emacs-audit--tabulated-list-number-sort-fn 6))
+                  ("Melpa downloads" 17 ,(emacs-audit--tabulated-list-number-sort-fn 4))
+                  ("GH Stars" 10 ,(emacs-audit--tabulated-list-number-sort-fn 5))
+                  ("GH Forks" 10 ,(emacs-audit--tabulated-list-number-sort-fn 6))
+                  ("GH Issues" 11 ,(emacs-audit--tabulated-list-number-sort-fn 7))
+                  ("GH PRs" 8 ,(emacs-audit--tabulated-list-number-sort-fn 8))
+                  ("GH Releases" 13 ,(emacs-audit--tabulated-list-number-sort-fn 9))
+                  ("GH Vulns" 10 ,(emacs-audit--tabulated-list-number-sort-fn 10))
+                  ("Created at" 12 t)
+                  ("Pushed at" 12 t)
                   ("Summary" 20 t)])
     (setq-local tabulated-list-padding 2)
     (tabulated-list-init-header)
@@ -229,6 +235,18 @@
                               (gethash "github_stars_count" package-fields))
                              (emacs-audit--handle-optional-number
                               (gethash "github_forks_count" package-fields))
+                             (emacs-audit--handle-optional-number
+                              (gethash "github_issues_count" package-fields))
+                             (emacs-audit--handle-optional-number
+                              (gethash "github_pull_requests_count" package-fields))
+                             (emacs-audit--handle-optional-number
+                              (gethash "github_releases_count" package-fields))
+                             (emacs-audit--handle-optional-number
+                              (gethash "github_vulnerability_alerts_count" package-fields))
+                             (emacs-audit--handle-optional
+                              (gethash "github_created_at" package-fields))
+                             (emacs-audit--handle-optional
+                              (gethash "github_pushed_at" package-fields))
                              (gethash "summary" package-fields))))
              emacs-audit--package-index)
     (setq-local tabulated-list-entries

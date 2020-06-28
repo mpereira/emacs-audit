@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use chrono::DateTime;
+use chrono::{prelude::*, DateTime};
 use futures::try_join;
 use regex::{Captures, Regex};
 use std::path::PathBuf;
@@ -15,8 +15,16 @@ const GITHUB_GRAPHQL_ENDPOINT: &'static str = "https://api.github.com/graphql";
 const DEFAULT_ENRICHED_PACKAGE_JSON_FILE_NAME: &'static str =
     "enriched_package_index.json";
 const USER_AGENT: &'static str = "emacs-audit";
-const GITHUB_REPOSITORIES_GRAPHQL_QUERY_FIELDS: &str =
-    "{licenseInfo {name}, forkCount, stargazers {totalCount}}";
+const GITHUB_REPOSITORIES_GRAPHQL_QUERY_FIELDS: &str = "{\
+      createdAt, \
+      pushedAt, \
+      forkCount, \
+      licenseInfo {name}, \
+      stargazers {totalCount}, \
+      issues(filterBy: { states: [OPEN] }) {totalCount}, \
+      pullRequests(states: [OPEN]) {totalCount}, \
+      releases {totalCount}, \
+      vulnerabilityAlerts {totalCount}}";
 
 type Count = u32;
 type PackageName = String;
@@ -219,8 +227,14 @@ struct Package {
     // from Melpa.
     melpa_downloads_count: Option<Count>,
     // from Github.
-    github_forks_count: Option<Count>,
+    github_created_at: Option<String>,
+    github_pushed_at: Option<String>,
     github_stars_count: Option<Count>,
+    github_forks_count: Option<Count>,
+    github_issues_count: Option<Count>,
+    github_pull_requests_count: Option<Count>,
+    github_releases_count: Option<Count>,
+    github_vulnerability_alerts_count: Option<Count>,
     github_license: Option<String>,
 }
 
@@ -268,15 +282,21 @@ struct GithubRepositoryLicenseInfo {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct GithubRepositoryStargazers {
+struct GithubRepositoryFieldWithCount {
     total_count: Count,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct GithubRepository {
+    created_at: DateTime<Utc>,
+    pushed_at: DateTime<Utc>,
     fork_count: Count,
-    stargazers: GithubRepositoryStargazers,
+    stargazers: GithubRepositoryFieldWithCount,
+    issues: GithubRepositoryFieldWithCount,
+    pull_requests: GithubRepositoryFieldWithCount,
+    releases: GithubRepositoryFieldWithCount,
+    vulnerability_alerts: GithubRepositoryFieldWithCount,
     license_info: Option<GithubRepositoryLicenseInfo>,
 }
 
@@ -544,9 +564,20 @@ async fn enrich_package_index(
 
         if let Some(Some(repository)) = github_repositories.data.get(package_id)
         {
-            package.github_forks_count = Some(repository.fork_count);
             package.github_stars_count =
                 Some(repository.stargazers.total_count);
+            package.github_created_at =
+                Some(repository.created_at.format("%Y-%m-%d").to_string());
+            package.github_pushed_at =
+                Some(repository.pushed_at.format("%Y-%m-%d").to_string());
+            package.github_forks_count = Some(repository.fork_count);
+            package.github_issues_count = Some(repository.issues.total_count);
+            package.github_pull_requests_count =
+                Some(repository.pull_requests.total_count);
+            package.github_releases_count =
+                Some(repository.releases.total_count);
+            package.github_vulnerability_alerts_count =
+                Some(repository.vulnerability_alerts.total_count);
             package.github_license = repository
                 .license_info
                 .as_ref()
