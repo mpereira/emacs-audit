@@ -19,7 +19,16 @@ const GITHUB_REPOSITORIES_GRAPHQL_QUERY_FIELDS: &str =
     "{licenseInfo {name}, forkCount, stargazers {totalCount}}";
 
 type Count = u32;
-type MelpaDownloadCounts = HashMap<String, Count>;
+type PackageName = String;
+type MelpaDownloadCounts = HashMap<PackageName, Count>;
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct MelpaRecipe {
+    repo: String,
+    fetcher: String,
+}
+
+type MelpaRecipes = HashMap<PackageName, MelpaRecipe>;
 
 fn _configuration_directory_path(home_directory: String) -> String {
     format!("{}/.config/{}", home_directory, PROGRAM_NAME)
@@ -48,6 +57,38 @@ fn write_json_file(file_path: String, content: &String) -> Result<()> {
         .context(format!("failed to write file {}", &file_path))?)
 }
 
+async fn fetch_melpa_recipes() -> Result<MelpaRecipes> {
+    let home_directory =
+        env::var("HOME").context("HOME environment variable is required")?;
+
+    let response: reqwest::Response =
+        reqwest::get(&format!("{}/recipes.json", MELPA_URL))
+            .await
+            .context("failed to fetch MELPA recipes")?;
+
+    let response_headers = response.headers().clone();
+    let _last_modified = response_headers.get("last-modified");
+    let _content_length = response_headers.get("content-length");
+    let response_text = response
+        .text()
+        .await
+        .context("failed to extract text from MELPA response")?;
+    let melpa_recipes: MelpaRecipes = serde_json::from_str(&*response_text)
+        .context("failed to deserialize MELPA response into JSON")?;
+
+    // eprintln!("{:#?}", content_length);
+    // eprintln!("{:#?}", response_headers);
+    // eprintln!("{:#?}", last_modified);
+
+    write_json_file(
+        cache_file_path(&home_directory, "melpa_recipes.json"),
+        &response_text,
+    )
+    .context("failed to write MELPA recipes file")?;
+
+    Ok(melpa_recipes)
+}
+
 async fn fetch_melpa_download_counts() -> Result<MelpaDownloadCounts> {
     let home_directory =
         env::var("HOME").context("HOME environment variable is required")?;
@@ -55,7 +96,7 @@ async fn fetch_melpa_download_counts() -> Result<MelpaDownloadCounts> {
     let response: reqwest::Response =
         reqwest::get(&format!("{}/download_counts.json", MELPA_URL))
             .await
-            .context("failed to fetch download counts from MELPA")?;
+            .context("failed to fetch MELPA download counts")?;
 
     let response_headers = response.headers().clone();
     let _last_modified = response_headers.get("last-modified");
@@ -87,8 +128,6 @@ struct Repository {
     owner: String,
     name: String,
 }
-
-type PackageName = String;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct Package {
@@ -401,8 +440,9 @@ async fn enrich_package_index(
         build_github_repositories_query_request_body(&package_index);
     // eprintln!("{:#?}", request_body);
 
-    let (melpa_download_counts, github_repositories) = try_join!(
+    let (melpa_download_counts, melpa_recipes, github_repositories) = try_join!(
         fetch_melpa_download_counts(),
+        fetch_melpa_recipes(),
         fetch_github_repositories(request_body, github_access_token)
     )?;
 
