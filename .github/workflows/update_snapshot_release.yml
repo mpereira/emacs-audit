@@ -1,0 +1,123 @@
+on:
+  push:
+    branch: master
+
+name: Update snapshot release
+
+jobs:
+  build:
+    name: ${{ matrix.build }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build:
+          - stable-x86_64-unknown-linux-gnu
+          - stable-x86_64-apple-darwin
+        include:
+          - build: stable-x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-gnu
+            # Linking on a too new Ubuntu results in the binary not working on
+            # older Linuxes due to required glibc not being available.
+            os: ubuntu-16.04
+            rust: stable
+          - build: stable-x86_64-apple-darwin
+            target: x86_64-apple-darwin
+            os: macos-latest
+            rust: stable
+    outputs:
+      emacs_audit_version: ${{ steps.emacs_audit_version.outputs.emacs_audit_version }}
+    steps:
+      - uses: actions/checkout@v2
+        name: Check out repository
+        with:
+          # Fetch complete history with all tags and branches.
+          fetch-depth: 0
+
+      - uses: actions-rs/toolchain@v1
+        name: Install Rust toolchain
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        name: Run 'cargo clean'
+        with:
+          command: clean
+          args: --package emacs-audit
+
+      - uses: actions-rs/cargo@v1
+        name: Run 'cargo build'
+        with:
+          command: build
+          args: --target ${{ matrix.target }} --release
+        env:
+          EMACS_AUDIT_GITHUB_ACCESS_TOKEN: ${{ secrets.EMACS_AUDIT_GITHUB_ACCESS_TOKEN }}
+
+      - name: Set $EMACS_AUDIT_DIRECTORY
+        run: echo ::set-env name=EMACS_AUDIT_DIRECTORY::target/${{ matrix.target }}/release
+
+      - name: Set $EMACS_AUDIT
+        run: echo ::set-env name=EMACS_AUDIT::${{ env.EMACS_AUDIT_DIRECTORY }}/emacs-audit
+
+      - name: Set $EMACS_AUDIT_VERSION
+        run: >
+          echo ::set-env name=EMACS_AUDIT_VERSION::$(${{ env.EMACS_AUDIT }} --version | cut -f2 -d" ")
+
+      - name: Set emacs_audit_version output
+        id: emacs_audit_version
+        run: echo ::set-output name=emacs_audit_version::${{ env.EMACS_AUDIT_VERSION }}
+
+      - name: Set $EMACS_AUDIT_ARCHIVE
+        run: echo ::set-env name=EMACS_AUDIT_ARCHIVE::emacs-audit-${{ env.EMACS_AUDIT_VERSION }}-${{ matrix.target }}.zip
+
+      - name: Check binary size before stripping
+        run: du -h ${{ env.EMACS_AUDIT }}
+
+      - name: Strip binary
+        run: strip ${{ env.EMACS_AUDIT }}
+
+      - name: Check binary size after stripping
+        run: du -h ${{ env.EMACS_AUDIT }}
+
+      - name: Create archive with binary
+        run: cd ${{ env.EMACS_AUDIT_DIRECTORY }} && zip -r ../../../${{ env.EMACS_AUDIT_ARCHIVE }} emacs-audit
+
+      - name: Check archive size
+        run: du -h ${{ env.EMACS_AUDIT_ARCHIVE }}
+
+      - name: Upload archive with binary to release artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: release-artifacts
+          path: ${{ env.EMACS_AUDIT_ARCHIVE }}
+
+  update-release:
+    needs: [build]
+    name: Update release (${{ needs.build.outputs.emacs_audit_version }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update release
+        id: update_release
+        uses: meeDamian/github-release@2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ needs.build.outputs.emacs_audit_version }}
+          name: ${{ needs.build.outputs.emacs_audit_version }}
+          commitish: ${{ github.sha }}
+          prerelease: true
+          allow_override: true
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: release-artifacts
+
+      - name: Upload release artifacts to GitHub release
+        uses: svenstaro/upload-release-action@v1-release
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ needs.build.outputs.emacs_audit_version }}
+          file: release-artifacts/*
+          overwrite: true
+          file_glob: true
