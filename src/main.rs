@@ -68,6 +68,18 @@ impl MelpaRecipe {
     }
 }
 
+fn is_repository_provider_url(url: &&Url) -> bool {
+    Regex::new(r"(?:(?:github|gitlab)\.com|framagit\.org)")
+        .unwrap()
+        .is_match(url.host_str().unwrap())
+}
+
+fn extract_repository_owner_and_name<'a>(url: &'a Url) -> Option<Captures<'a>> {
+    Regex::new(r"/?(?P<owner>.+?)/(?P<name>[^/]+)(?:\.git)?")
+        .unwrap()
+        .captures(url.path())
+}
+
 type MelpaRecipes = HashMap<PackageName, MelpaRecipe>;
 
 fn _configuration_directory_path(home_directory: String) -> String {
@@ -300,18 +312,6 @@ fn build_repository_query(
     )
 }
 
-fn is_github_repository_url(url: &&Url) -> bool {
-    url.host_str().unwrap().matches(r"github.com").count() == 1
-}
-
-fn extract_github_repository_owner_and_name<'a>(
-    url: &'a Url,
-) -> Option<Captures<'a>> {
-    Regex::new(r"/?(?P<owner>.+?)/(?P<name>[^/]+)(?:\.git)?")
-        .unwrap()
-        .captures(url.path())
-}
-
 fn parse_repository_from_package_url(
     package: &Package,
 ) -> Option<Option<Repository>> {
@@ -320,8 +320,8 @@ fn parse_repository_from_package_url(
     package
         .url
         .as_ref()
-        .filter(is_github_repository_url)
-        .map(extract_github_repository_owner_and_name)
+        .filter(is_repository_provider_url)
+        .map(extract_repository_owner_and_name)
         .map(|captures| {
             captures.map(|c| Repository {
                 owner: c["owner"].to_owned(),
@@ -502,14 +502,15 @@ async fn enrich_package_index(
 
         for (_package_id, package) in package_index.iter_mut() {
             if package.repository.is_none() {
-                package.repository =
-                    melpa_recipes.get(&package.name).map_or_else(
-                        || {
-                            parse_repository_from_package_url(package)
-                                .unwrap_or_default()
-                        },
-                        |recipe| recipe.clone().into(),
-                    );
+                if let Some(repository) = melpa_recipes
+                    .get(&package.name)
+                    .map(|recipe| -> Option<Repository> {
+                        recipe.clone().into()
+                    })
+                    .or(parse_repository_from_package_url(package))
+                {
+                    package.repository = repository;
+                }
             }
         }
 
