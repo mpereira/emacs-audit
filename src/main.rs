@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::DateTime;
 use futures::try_join;
 use regex::{Captures, Regex};
@@ -24,8 +24,49 @@ type MelpaDownloadCounts = HashMap<PackageName, Count>;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct MelpaRecipe {
-    repo: String,
+    repo: Option<String>,
+    url: Option<Url>,
     fetcher: String,
+}
+
+fn build_repository_provider_url(
+    provider_base_url: &str,
+    namespaced_repository: &Option<String>,
+) -> Result<Url> {
+    if let Some(repo) = namespaced_repository {
+        let url = format!("{}/{}", provider_base_url, repo);
+        Url::parse(&url).context(format!("failed to parse {} as an URL", url))
+    } else {
+        Err(anyhow!(
+            "couldn't fallback to empty 'repo' field to build \
+             MELPA recipe URL"
+        ))
+    }
+}
+
+fn repository_url_or_error(repository_url: &Option<Url>) -> Result<Url> {
+    repository_url.clone().ok_or(anyhow!(
+        "couldn't fallback to empty 'url' field to build \
+                 MELPA recipe URL"
+    ))
+}
+
+impl MelpaRecipe {
+    fn url(&self) -> Result<Url> {
+        match self.fetcher.as_str() {
+            "github" => {
+                build_repository_provider_url("https://github.com", &self.repo)
+            }
+            "gitlab" => {
+                build_repository_provider_url("https://gitlab.com", &self.repo)
+            }
+            "hg" => repository_url_or_error(&self.url),
+            "git" => repository_url_or_error(&self.url),
+            fetcher => {
+                Err(anyhow!("don't know how to build URL for {}", fetcher))
+            }
+        }
+    }
 }
 
 type MelpaRecipes = HashMap<PackageName, MelpaRecipe>;
@@ -451,6 +492,13 @@ async fn enrich_package_index(
         if let Some(download_counts) = melpa_download_counts.get(&package.name)
         {
             package.melpa_downloads_count = Some(*download_counts);
+        }
+
+        if let Some(recipe) = melpa_recipes.get(&package.name)
+        {
+            if package.url.is_none() {
+                package.url = recipe.url().ok();
+            }
         }
 
         if let Some(Some(repository)) = github_repositories.data.get(package_id)
