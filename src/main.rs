@@ -46,7 +46,7 @@ fn _user_data_directory_path(home_directory: String) -> String {
     format!("{}/.local/share/{}", home_directory, PROGRAM_NAME)
 }
 
-fn write_json_file(file_path: String, content: &String) -> Result<()> {
+fn write_json_file(file_path: &str, content: &String) -> Result<()> {
     Path::new(&file_path)
         .parent()
         .and_then(|p| fs::create_dir_all(p).ok());
@@ -81,8 +81,9 @@ async fn fetch_melpa_recipes() -> Result<MelpaRecipes> {
     // eprintln!("{:#?}", last_modified);
 
     write_json_file(
-        cache_file_path(&home_directory, "melpa_recipes.json"),
-        &response_text,
+        &cache_file_path(&home_directory, "melpa_recipes.json"),
+        &serde_json::to_string_pretty(&melpa_recipes)
+            .context("failed to pretty print MELPA recipes JSON")?,
     )
     .context("failed to write MELPA recipes file")?;
 
@@ -114,7 +115,7 @@ async fn fetch_melpa_download_counts() -> Result<MelpaDownloadCounts> {
     // eprintln!("{:#?}", last_modified);
 
     write_json_file(
-        cache_file_path(&home_directory, "melpa_download_counts.json"),
+        &cache_file_path(&home_directory, "melpa_download_counts.json"),
         &response_text,
     )
     .context("failed to write MELPA download counts file")?;
@@ -347,7 +348,7 @@ async fn fetch_github_repositories<'a>(
     .context("failed to parse GitHub repositories response into JSON")?;
 
     write_json_file(
-        cache_file_path(&home_directory, "github_repositories.json"),
+        &cache_file_path(&home_directory, "github_repositories.json"),
         &serde_json::to_string_pretty(&github_repositories)
             .context("failed to pretty print GitHub repositories JSON")?,
     )
@@ -462,11 +463,13 @@ async fn enrich_package_index(
         }
     }
 
+    let enriched_package_file_path = cache_file_path(
+        &home_directory,
+        DEFAULT_ENRICHED_PACKAGE_JSON_FILE_NAME,
+    );
+
     write_json_file(
-        cache_file_path(
-            &home_directory,
-            DEFAULT_ENRICHED_PACKAGE_JSON_FILE_NAME,
-        ),
+        &enriched_package_file_path,
         &serde_json::to_string_pretty(&package_index)
             .context("error serializing enriched package index to JSON")?,
     )
