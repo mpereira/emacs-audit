@@ -171,6 +171,23 @@ struct Repository {
     name: String,
 }
 
+impl From<MelpaRecipe> for Option<Repository> {
+    fn from(recipe: MelpaRecipe) -> Self {
+        let url = recipe.url().ok()?;
+        let repo = recipe.repo?;
+        let parts: Vec<&str> = repo.splitn(2, r"/").collect();
+        if let (Some(owner), Some(name)) = (parts.get(0), parts.get(1)) {
+            Some(Repository {
+                url,
+                owner: owner.to_string(),
+                name: name.to_string(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct Package {
     // from package.el.
@@ -472,20 +489,45 @@ async fn enrich_package_index(
     )
     .context(format!("error parsing JSON {}", &package_index_path))?;
 
-    for (_package_id, package) in package_index.iter_mut() {
-        if let Some(repository) = parse_repository_from_package_url(package) {
-            package.repository = repository;
+    let fetch_melpa_recipes_and_github_repositories = async {
+        // `build_github_repositories_query_request_body` needs the
+        // `package.repository` field values to be present, so before calling it
+        // we download MELPA package recipes (which contain repository
+        // information) and fill `Package`s with them if they don't already have
+        // a repository.
+        //
+        // If a MELPA recipe for a given `Package` *also* doesn't have
+        // repository information, fallback to extracting repository information
+        // from `package.url`.
+        let melpa_recipes = fetch_melpa_recipes().await?;
+
+        for (_package_id, package) in package_index.iter_mut() {
+            if package.repository.is_none() {
+                package.repository =
+                    melpa_recipes.get(&package.name).map_or_else(
+                        || {
+                            parse_repository_from_package_url(package)
+                                .unwrap_or_default()
+                        },
+                        |recipe| recipe.clone().into(),
+                    );
+            }
         }
-    }
 
-    let request_body =
-        build_github_repositories_query_request_body(&package_index);
-    // eprintln!("{:#?}", request_body);
+        let request_body =
+            build_github_repositories_query_request_body(&package_index);
+        // eprintln!("{:#?}", request_body);
 
-    let (melpa_download_counts, melpa_recipes, github_repositories) = try_join!(
+        let github_repositories =
+            fetch_github_repositories(request_body, github_access_token)
+                .await?;
+
+        Ok::<(_, _), anyhow::Error>((melpa_recipes, github_repositories))
+    };
+
+    let (melpa_download_counts, (melpa_recipes, github_repositories)) = try_join!(
         fetch_melpa_download_counts(),
-        fetch_melpa_recipes(),
-        fetch_github_repositories(request_body, github_access_token)
+        fetch_melpa_recipes_and_github_repositories
     )?;
 
     for (package_id, package) in package_index.iter_mut() {
@@ -494,8 +536,7 @@ async fn enrich_package_index(
             package.melpa_downloads_count = Some(*download_counts);
         }
 
-        if let Some(recipe) = melpa_recipes.get(&package.name)
-        {
+        if let Some(recipe) = melpa_recipes.get(&package.name) {
             if package.url.is_none() {
                 package.url = recipe.url().ok();
             }
@@ -506,8 +547,10 @@ async fn enrich_package_index(
             package.github_forks_count = Some(repository.fork_count);
             package.github_stars_count =
                 Some(repository.stargazers.total_count);
-            package.github_license =
-                repository.license_info.as_ref().map(|li| li.name.clone())
+            package.github_license = repository
+                .license_info
+                .as_ref()
+                .map(|license_info| license_info.name.clone())
         }
     }
 
