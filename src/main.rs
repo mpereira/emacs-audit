@@ -10,11 +10,7 @@ use structopt::StructOpt;
 use url::Url;
 
 const MELPA_URL: &'static str = "https://melpa.org";
-const PROGRAM_NAME: &'static str = "emacs_audit";
 const GITHUB_GRAPHQL_ENDPOINT: &'static str = "https://api.github.com/graphql";
-const DEFAULT_ENRICHED_PACKAGE_JSON_FILE_NAME: &'static str =
-    "enriched_package_index.json";
-const USER_AGENT: &'static str = "emacs-audit";
 const GITHUB_REPOSITORIES_GRAPHQL_QUERY_FIELDS: &str = "{\
       createdAt, \
       pushedAt, \
@@ -90,20 +86,31 @@ fn extract_repository_owner_and_name<'a>(url: &'a Url) -> Option<Captures<'a>> {
 
 type MelpaRecipes = HashMap<PackageName, MelpaRecipe>;
 
-fn _configuration_directory_path(home_directory: String) -> String {
-    format!("{}/.config/{}", home_directory, PROGRAM_NAME)
+fn _configuration_file_path(home_directory: &str, file_name: &str) -> String {
+    format!(
+        "{}/.config/{}/{}",
+        home_directory,
+        build_info::PKG_NAME,
+        file_name
+    )
 }
 
-fn cache_directory_path(home_directory: &String) -> String {
-    format!("{}/.cache/{}", home_directory, PROGRAM_NAME)
+fn _user_data_file_path(home_directory: &str, file_name: &str) -> String {
+    format!(
+        "{}/.local/share/{}/{}",
+        home_directory,
+        build_info::PKG_NAME,
+        file_name
+    )
 }
 
 fn cache_file_path(home_directory: &String, file_name: &str) -> String {
-    format!("{}/{}", cache_directory_path(home_directory), file_name)
-}
-
-fn _user_data_directory_path(home_directory: String) -> String {
-    format!("{}/.local/share/{}", home_directory, PROGRAM_NAME)
+    format!(
+        "{}/.cache/{}/{}",
+        home_directory,
+        build_info::PKG_NAME,
+        file_name
+    )
 }
 
 fn write_json_file(file_path: &str, content: &String) -> Result<()> {
@@ -384,13 +391,14 @@ fn build_github_repositories_query_request_body<'a>(
 async fn fetch_github_repositories<'a>(
     request_body: GraphQlRequestBody<'a>,
     github_access_token: Option<String>,
+    user_agent: &str,
 ) -> Result<GithubRepositoriesResponse> {
     let home_directory =
         env::var("HOME").context("HOME environment variable is required")?;
 
     let request = reqwest::Client::new()
         .post(GITHUB_GRAPHQL_ENDPOINT)
-        .header("User-Agent", USER_AGENT)
+        .header("User-Agent", user_agent)
         .header(
             "Authorization",
             format!(
@@ -496,8 +504,7 @@ async fn enrich_package_index(
     package_index: PathBuf,
     github_access_token: Option<String>,
 ) -> Result<()> {
-    let home_directory =
-        env::var("HOME").context("HOME environment variable is required")?;
+    let user_agent = version();
 
     let package_index_path = package_index
         .to_str()
@@ -538,9 +545,12 @@ async fn enrich_package_index(
             build_github_repositories_query_request_body(&package_index);
         // eprintln!("{:#?}", request_body);
 
-        let github_repositories =
-            fetch_github_repositories(request_body, github_access_token)
-                .await?;
+        let github_repositories = fetch_github_repositories(
+            request_body,
+            github_access_token,
+            &user_agent,
+        )
+        .await?;
 
         Ok::<(_, _), anyhow::Error>((melpa_recipes, github_repositories))
     };
