@@ -595,21 +595,11 @@ async fn enrich_package_index(
         }
     }
 
-    let enriched_package_file_path = cache_file_path(
-        &home_directory,
-        DEFAULT_ENRICHED_PACKAGE_JSON_FILE_NAME,
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&package_index)
+            .context("error serializing enriched package index to JSON")?
     );
-
-    write_json_file(
-        &enriched_package_file_path,
-        &serde_json::to_string_pretty(&package_index)
-            .context("error serializing enriched package index to JSON")?,
-    )
-    .and_then(|_| {
-        eprintln!("Wrote {}", &enriched_package_file_path);
-        Ok(())
-    })
-    .context("error writing enriched package index")?;
 
     Ok(())
 }
