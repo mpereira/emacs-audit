@@ -93,7 +93,10 @@
 
 ;;;; Variables
 
-(defvar emacs-audit-version 'undefined
+(defvar emacs-audit-version "1.0.0-snapshot"
+  "TODO: docstring.")
+
+(defvar emacs-audit--repository-url "https://github.com/mpereira/emacs-audit"
   "TODO: docstring.")
 
 (defvar emacs-audit--program-name (file-name-sans-extension
@@ -103,29 +106,44 @@
 (defvar emacs-audit--package-index nil
   "TODO: docstring.")
 
-(defvar emacs-audit--repository-directory (directory-file-name
-                                           (file-name-directory
-                                            (directory-file-name
-                                             (file-name-directory
-                                              (buffer-file-name)))))
+(defvar emacs-audit--local-repository-directory (directory-file-name
+                                                 (file-name-directory
+                                                  (directory-file-name
+                                                   (file-name-directory
+                                                    (buffer-file-name)))))
+  "TODO: docstring.")
+
+(defvar emacs-audit--extracted-archive-directory nil
   "TODO: docstring.")
 
 (defvar emacs-audit--enrich-package-index-process nil
+  
+  "TODO: docstring.")
+
+(defvar emacs-audit--supported-platforms '("x86_64-apple-darwin"
+                                           "x86_64-unknown-linux-gnu")
+  "TODO: docstring.")
+
+(defvar emacs-audit--directories '(:cache ".cache"
+                                   :configuration ".config"
+                                   :user-data ".local/share")
+  "TODO: docstring.")
+
+(defvar emacs-audit--development-emacs-audit-command
+  `("cargo"
+    "run"
+    "--manifest-path" ,(format "%s/Cargo.toml" emacs-audit--local-repository-directory)
+    "--")
+  "TODO: docstring.")
+
+(defvar emacs-audit--environment 'production
   "TODO: docstring.")
 
 ;;;; Options
 
-(defun emacs-audit--package-index-default-get-directory ()
-  "TODO: docstring."
-  (let ((directory (concat
-                    (getenv "HOME") "/.cache/" emacs-audit--program-name)))
-    (unless (file-exists-p directory)
-      (make-directory directory t))
-    directory))
-
 (defgroup emacs-audit nil
   "Settings for `emacs-audit'."
-  :link '(url-link "https://github.com/mpereira/emacs-audit")
+  :link `(url-link ,emacs-audit--repository-url)
   :group 'tools)
 
 (defcustom emacs-audit-special-package-file-names
@@ -150,31 +168,97 @@
   :group 'emacs-audit
   :type 'string)
 
-(defcustom emacs-audit-package-index-get-directory-fn
-  'emacs-audit--package-index-default-get-directory
-  "TODO: docstring."
-  :group 'emacs-audit
-  :type 'function)
-
 (defcustom emacs-audit-github-token nil
   "TODO: docstring."
   :group 'emacs-audit
   :type 'string)
 
-(defcustom emacs-audit-executable "cargo"
-  "TODO: docstring."
-  :group 'emacs-audit
-  :type 'string)
-
-(defcustom emacs-audit-args
-  `("run" "--manifest-path" ,(format "%s/Cargo.toml" emacs-audit--repository-directory)
-    "--"
-    "enrich-package-index")
-  "TODO: docstring."
-  :group 'emacs-audit
-  :type 'list)
-
 ;;;; Helper functions and macros
+
+(defun emacs-audit--get-platform ()
+  "TODO: docstring."
+  (let ((matches (s-match-strings-all
+                  (s-join "\\|" emacs-audit--supported-platforms)
+                  system-configuration)))
+    (when matches
+      (if (= 1 (length matches))
+          (caar matches)
+        (error "Unexpected multiple platform match for %s"
+               system-configuration)))))
+
+(defmacro emacs-audit--with-platform (platform &rest body)
+  "TODO: PLATFORM BODY docstring."
+  `(if-let ((,platform ,(emacs-audit--get-platform)))
+       ,@body
+     (message (concat "%s is not a supported platform. "
+                      "Check `emacs-audit--supported-platforms'")
+              system-configuration)))
+
+(defmacro emacs-audit--with-executable (executable &rest body)
+  "TODO: EXECUTABLE BODY docstring."
+  `(if emacs-audit--extracted-archive-directory
+       (let ((,executable ,(concat emacs-audit--extracted-archive-directory
+                                   emacs-audit--program-name)))
+         ,@body)
+     (progn
+       (message (concat "%s executable is not available. "
+                        "Run `emacs-audit-setup'")
+                emacs-audit--program-name)
+       nil)))
+
+(defun emacs-audit--directory (directory-type)
+  "TODO: DIRECTORY-TYPE docstring."
+  (let* ((directory (plist-get emacs-audit--directories directory-type))
+         (_ (or directory (error "No directory type %s in %s"
+                                 directory-type
+                                 emacs-audit--directories)))
+         (directory
+          (concat
+           (getenv "HOME") "/" directory "/" emacs-audit--program-name)))
+    (unless (file-exists-p directory)
+      (make-directory directory t))
+    directory))
+
+(defun emacs-audit--archive-file-name (platform)
+  "TODO: PLATFORM docstring."
+  (format "emacs-audit-%s-%s.zip" emacs-audit-version platform))
+
+(defun emacs-audit--archive-file-path (platform)
+  "TODO: PLATFORM docstring."
+  (concat (emacs-audit--directory :user-data)
+          "/"
+          (emacs-audit--archive-file-name platform)))
+
+(defun emacs-audit--archive-url (platform)
+  "TODO: VERSION PLATFORM docstring."
+  (format "%s/releases/download/%s/%s"
+          emacs-audit--repository-url
+          emacs-audit-version
+          (emacs-audit--archive-file-name platform)))
+
+(defun emacs-audit--archive-download ()
+  "TODO: docstring."
+  (interactive)
+  (emacs-audit--with-platform
+   platform
+   (url-copy-file (emacs-audit--archive-url platform)
+                  (emacs-audit--archive-file-path platform))))
+
+(defun emacs-audit--archive-extract ()
+  "TODO: docstring."
+  (interactive)
+  (emacs-audit--with-platform
+   platform
+   (let ((archive (emacs-audit--archive-file-path platform)))
+     (if-let ((uncompressed-directory (dired-compress-file archive)))
+         (setq emacs-audit--extracted-archive-directory uncompressed-directory)
+       (message "Failed to extract %s" archive)))))
+
+(defun emacs-audit--command ()
+  "TODO: docstring."
+  (if (eq 'development emacs-audit--environment)
+      emacs-audit--development-emacs-audit-command
+    (emacs-audit--with-executable emacs-audit emacs-audit)))
 
 (defun emacs-audit--parse-name-and-email-address (part-alist)
   "TODO: PART-ALIST docstring."
@@ -199,19 +283,20 @@
 
 (defun emacs-audit--emacs-audit-package-index-raw-file-path ()
   "TODO: docstring."
-  (concat (funcall emacs-audit-package-index-get-directory-fn)
+  (concat (emacs-audit--directory :cache)
           "/"
           emacs-audit-package-index-raw-file-name))
 
 (defun emacs-audit--emacs-audit-package-index-enriched-file-path ()
   "TODO: docstring."
-  (concat (funcall emacs-audit-package-index-get-directory-fn)
+  (concat (emacs-audit--directory :cache)
           "/"
           emacs-audit-package-index-enriched-file-name))
 
-(defun emacs-audit--enrich-package-index-command ()
-  "TODO: docstring."
-  (append (cons emacs-audit-executable emacs-audit-args)
+(defun emacs-audit--enrich-package-index-command (command)
+  "TODO: COMMAND docstring."
+  (append (list command)
+          '("enrich-package-index")
           (list (emacs-audit--emacs-audit-package-index-raw-file-path))
           (apply 'list (when emacs-audit-github-token
                          (list "--token" emacs-audit-github-token)))))
@@ -253,6 +338,24 @@
 
 ;;;; Commands
 
+(defun emacs-audit-setup ()
+  "TODO: docstring."
+  (interactive)
+  (emacs-audit--archive-download)
+  (emacs-audit--archive-extract))
+
+(defun emacs-audit-clean ()
+  "TODO: docstring."
+  (interactive)
+  (plist-each (lambda (directory-type _directory-name)
+                (delete-directory (emacs-audit--directory directory-type)
+                                  'recursive))
+              emacs-audit--directories)
+  (-each '(emacs-audit--extracted-archive-directory
+           emacs-audit--package-index)
+    (lambda (var)
+      (set var nil))))
+
 (defun emacs-audit-dump-package-index (&optional path)
   "TODO: PATH docstring."
   (interactive)
@@ -292,34 +395,34 @@
       (json-pretty-print-buffer)
       (message "Wrote %s" path))))
 
-(defun emacs-audit-list-packages-clear ()
-  "TODO: docstring."
-  (interactive)
-  (setq emacs-audit--package-index nil))
-
 (defun emacs-audit-list-packages-refresh ()
   "TODO: docstring."
   (interactive)
-  (let ((process-buffer (generate-new-buffer "*temp*"))
-        (list-packages (not (called-interactively-p 'any))))
-    (message "Fetching package data asynchronously%s"
-             (if list-packages
-                 ", package list will open soon"
-               ""))
-    (with-current-buffer process-buffer
-      (let* ((name "emacs-audit-enrich-package-index")
-             (process (make-process
-                       :name name
-                       :buffer process-buffer
-                       :command (emacs-audit--enrich-package-index-command)
-                       :stderr (format "*%s stderr*" name)
-                       :sentinel
-                       #'(lambda (process event)
-                           (emacs-audit--enrich-package-index-process-sentinel
-                            process event (when list-packages
-                                            'list-packages))))))
-        (process-put process 'enriched-package-index-buffer process-buffer)
-        (setq emacs-audit--enrich-package-index-process process)))))
+  (emacs-audit--with-executable
+   emacs-audit
+   (when (not (file-exists-p (emacs-audit--emacs-audit-package-index-raw-file-path)))
+     (emacs-audit-dump-package-index))
+   (let ((process-buffer (generate-new-buffer "*temp*"))
+         (list-packages (not (called-interactively-p 'any))))
+     (message "Fetching package data asynchronously%s"
+              (if list-packages
+                  ", package list will open soon"
+                ""))
+     (with-current-buffer process-buffer
+       (let* ((name "emacs-audit-enrich-package-index")
+              (process (make-process
+                        :name name
+                        :buffer process-buffer
+                        :command (emacs-audit--enrich-package-index-command
+                                  emacs-audit)
+                        :stderr (format "*%s stderr*" name)
+                        :sentinel
+                        #'(lambda (process event)
+                            (emacs-audit--enrich-package-index-process-sentinel
+                             process event (when list-packages
+                                             'list-packages))))))
+         (process-put process 'enriched-package-index-buffer process-buffer)
+         (setq emacs-audit--enrich-package-index-process process))))))
 
 (defun emacs-audit-list-packages (arg)
   "TODO: ARG docstring."
