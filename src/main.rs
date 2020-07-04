@@ -4,7 +4,12 @@ use futures::try_join;
 use regex::{Captures, Regex};
 use std::path::PathBuf;
 use std::{
-    collections::HashMap, env, fmt, fs, fs::File, io::prelude::*, path::Path,
+    collections::HashMap,
+    env, fs,
+    fs::File,
+    hash::{Hash, Hasher},
+    io::prelude::*,
+    path::Path,
 };
 use structopt::StructOpt;
 use url::Url;
@@ -245,7 +250,7 @@ struct Package {
     github_license: Option<String>,
 }
 
-#[derive(serde::Serialize, PartialEq, Eq, Hash, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct PackageId(String);
 
 impl PackageId {
@@ -257,26 +262,17 @@ impl PackageId {
     }
 }
 
-impl From<String> for PackageId {
-    fn from(s: String) -> Self {
-        PackageId(PackageId::safe_identifier(&s))
+impl PartialEq for PackageId {
+    fn eq(&self, other: &Self) -> bool {
+        Self::safe_identifier(&self.0) == Self::safe_identifier(&other.0)
     }
 }
 
-impl fmt::Display for PackageId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", PackageId::safe_identifier(&self.0))
-    }
-}
+impl Eq for PackageId {}
 
-impl<'de> serde::Deserialize<'de> for PackageId {
-    fn deserialize<D>(
-        deserializer: D,
-    ) -> std::result::Result<PackageId, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Ok(String::deserialize(deserializer)?.into())
+impl Hash for PackageId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Self::safe_identifier(&self.0).hash(state);
     }
 }
 
@@ -335,7 +331,10 @@ fn build_repository_query(
 ) -> String {
     format!(
         "{}: repository(owner: \"{}\", name: \"{}\") {}",
-        package_id, repository.owner, repository.name, fields
+        PackageId::safe_identifier(&package_id.0),
+        repository.owner,
+        repository.name,
+        fields
     )
 }
 
