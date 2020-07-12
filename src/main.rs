@@ -17,15 +17,17 @@ use url::Url;
 const MELPA_URL: &'static str = "https://melpa.org";
 const GITHUB_GRAPHQL_ENDPOINT: &'static str = "https://api.github.com/graphql";
 const GITHUB_REPOSITORIES_GRAPHQL_QUERY_FIELDS: &str = "{\
-      createdAt, \
-      pushedAt, \
-      forkCount, \
-      licenseInfo {name}, \
-      stargazers {totalCount}, \
-      issues(filterBy: { states: [OPEN] }) {totalCount}, \
-      pullRequests(states: [OPEN]) {totalCount}, \
-      releases {totalCount}, \
-      vulnerabilityAlerts {totalCount}}";
+    createdAt, \
+    pushedAt, \
+    forkCount, \
+    licenseInfo {name}, \
+    stargazers {totalCount}, \
+    issues(filterBy: { states: [OPEN] }) {totalCount}, \
+    pullRequests(states: [OPEN]) {totalCount}, \
+    releases {totalCount}, \
+    vulnerabilityAlerts {totalCount} \
+}";
+// defaultBranchRef {target {... on Commit {history {totalCount}}}} \
 
 type Count = u32;
 type PackageName = String;
@@ -290,6 +292,16 @@ struct GithubRepositoryFieldWithCount {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
+struct GithubRepositoryTarget {
+    history: GithubRepositoryFieldWithCount,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+struct GithubRepositoryDefaultBranchRef {
+    target: GithubRepositoryTarget,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct GithubRepository {
     created_at: DateTime<Utc>,
@@ -301,6 +313,7 @@ struct GithubRepository {
     releases: GithubRepositoryFieldWithCount,
     vulnerability_alerts: GithubRepositoryFieldWithCount,
     license_info: Option<GithubRepositoryLicenseInfo>,
+    // default_branch_ref: GithubRepositoryDefaultBranchRef,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
