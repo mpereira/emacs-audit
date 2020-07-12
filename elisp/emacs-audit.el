@@ -1,12 +1,13 @@
-;;; emacs-audit.el --- TODO: description -*- lexical-binding: t; -*-
+;;; emacs-audit.el --- TODO: description -*- lexical-binding: t; coding: utf-8 -*-
 
 ;; Copyright (C) 2020 Murilo Pereira
 
 ;; Author: Murilo Pereira <murilo@murilopereira.com>
-;; URL: https://github.com/mpereira/emacs-audit.el
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "25.2") (json) (elx) (package))
+;; Maintainer: Murilo Pereira <murilo@murilopereira.com>
+;; URL: https://github.com/mpereira/emacs-audit
+;; Package-Requires: ((emacs "25.2") (json) (elx) (package) (dash) (s))
 ;; Keywords: maint
+;; SPDX-License-Identifier: GPL-3+
 
 ;; This file is not part of GNU Emacs.
 
