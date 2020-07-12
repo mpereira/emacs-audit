@@ -5,7 +5,7 @@
 ;; Author: Murilo Pereira <murilo@murilopereira.com>
 ;; Maintainer: Murilo Pereira <murilo@murilopereira.com>
 ;; URL: https://github.com/mpereira/emacs-audit
-;; Package-Requires: ((emacs "25.2") (json) (elx) (package) (dash) (s))
+;; Package-Requires: ((emacs "25.2") (dash) (elx) (json) (package) (s) (tablist))
 ;; Keywords: maint
 ;; SPDX-License-Identifier: GPL-3+
 
