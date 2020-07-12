@@ -314,13 +314,14 @@ struct GithubRepositoryError {
     locations: Vec<GithubRepositoryErrorLocation>,
     message: String,
     #[serde(rename = "type")]
-    kind: String,
+    kind: Option<String>,
+    extensions: Option<HashMap<String, String>>,
     path: Vec<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct GithubRepositoriesResponse {
-    data: HashMap<PackageId, Option<GithubRepository>>,
+    data: Option<HashMap<PackageId, Option<GithubRepository>>>,
     errors: Option<Vec<GithubRepositoryError>>,
 }
 
@@ -425,6 +426,7 @@ async fn fetch_github_repositories<'a>(
         .text()
         .await
         .context("failed to parse text from GitHub repositories response")?;
+    // eprintln!("{:#?}", response_body_text);
 
     let github_repositories: GithubRepositoriesResponse = serde_json::from_str(
         &response_body_text,
@@ -571,7 +573,10 @@ async fn enrich_package_index(
             }
         }
 
-        if let Some(Some(repository)) = github_repositories.data.get(package_id)
+        if let Some(Some(Some(repository))) = github_repositories
+            .data
+            .as_ref()
+            .map(|data| data.get(package_id))
         {
             package.github_stars_count =
                 Some(repository.stargazers.total_count);
