@@ -92,6 +92,17 @@ jobs:
           name: release-artifacts
           path: ${{ env.EMACS_AUDIT_ARCHIVE }}
 
+  update-tag:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update snapshot release tag
+        uses: richardsimko/update-tag@master
+        with:
+          tag_name: ${{ needs.build.outputs.emacs_audit_version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   update-release:
     needs: [build]
     name: Update release (${{ needs.build.outputs.emacs_audit_version }})
