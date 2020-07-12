@@ -1,4 +1,4 @@
-;;; emacs-audit.el --- TODO: description -*- lexical-binding: t; coding: utf-8 -*-
+;;; emacs-audit.el --- Show rich information about your Emacs setup  -*- lexical-binding: t; coding: utf-8 -*-
 
 ;; Copyright (C) 2020 Murilo Pereira
 
@@ -13,48 +13,194 @@
 
 ;;; Commentary:
 
-;; TODO: commentary.
+;; * emacs-audit
 
-;;;; Installation
+;; Show rich information about your Emacs setup.
 
-;;;;; MELPA
+;; ** Features
 
-;; If you installed from MELPA, you're done.
+;; - List all installed packages showing:
+;;   - Licenses
+;;   - Melpa download counts
+;;   - Github repositories
+;;     - Creation date
+;;     - Last commit date
+;;     - License
+;;     - Stars
+;;     - Forks
+;;     - Issues
+;;     - Pull requests
+;;     - Vulnerability alerts
+;; - ... and more to come
 
-;;;;; Manual
+;; ** Install
 
-;; Install these required packages:
+;; =emacs-audit= is currently not published to Melpa.
 
-;; + foo
-;; + bar
+;; *** Quelpa
 
-;; Then put this file in your load-path, and put this in your init
-;; file:
-
+;; #+begin_src emacs-lisp
+;; (quelpa
+;;  '(emacs-audit
+;;    :fetcher url
+;;    :url "https://github.com/mpereira/emacs-audit/releases/download/1.0.0-snapshot/emacs-audit.el"))
 ;; (require 'emacs-audit)
+;; #+end_src
 
-;;;; Usage
+;; Alternatively, if [[https://github.com/jwiegley/use-package/][use-package]] and [[https://github.com/quelpa/quelpa-use-package][quelpa-use-package]] are installed:
 
-;; Run one of these commands:
+;; #+begin_src emacs-lisp
+;; (use-package emacs-audit
+;;   :ensure nil
+;;   :quelpa (emacs-audit
+;;            :fetcher url
+;;            :url "https://github.com/mpereira/emacs-audit/releases/download/1.0.0-snapshot/emacs-audit.el"))
+;; #+end_src
 
-;; `emacs-audit-command': Frobnicate the flange.
+;; *** Manually
 
-;;;; Tips
+;; =emacs-audit= depends on:
+;; - dash
+;; - elx
+;; - json
+;; - package
+;; - s
+;; - tablist
 
-;; + You can customize settings in the `emacs-audit' group.
+;; Install them using =M-x package install RET <package> RET=.
 
-;;;; Credits
+;; Then create a directory for =emacs-audit= under your Emacs installation
+;; directory (usually =~/.emacs.d=):
 
-;; This package would not have been possible without the following
-;; packages: foo[1], which showed me how to bifurcate, and bar[2],
-;; which takes care of flanges.
-;;
-;;  [1] https://example.com/foo.el
-;;  [2] https://example.com/bar.el
+;; #+begin_src bash
+;; mkdir -p ~/.emacs.d/site-lisp/emacs-audit/lisp
+;; #+end_src
 
-;;; License:
+;; Then download =emacs-audit.el= into that directory:
 
-;; This program is free software; you can redistribute it and/or modify
+;; #+begin_src bash
+;; curl -sL \
+;;      https://github.com/mpereira/emacs-audit/releases/download/1.0.0-snapshot/emacs-audit.el \
+;;      -o ~/.emacs.d/site-lisp/emacs-audit/lisp/emacs-audit.el
+;; #+end_src
+
+;; Finally add this to your init file:
+
+;; #+begin_src emacs-lisp
+;; (add-to-list 'load-path "~/.emacs.d/site-lisp/emacs-audit/lisp")
+;; (require 'emacs-audit)
+;; #+end_src
+
+;; Evaluate the elisp above if you're doing this from a running Emacs instance.
+
+;; *** Straight
+
+;; If you know how to install a package from [[https://github.com/mpereira/emacs-audit/releases/download/1.0.0-snapshot/emacs-audit.el][a URL]] using [[https://github.com/raxod502/straight.el][straight.el]] please
+;; open a pull request.
+
+;; *** Doom
+
+;; If you know how to install a package from [[https://github.com/mpereira/emacs-audit/releases/download/1.0.0-snapshot/emacs-audit.el][a URL]] using Doom's [[https://github.com/hlissner/doom-emacs/blob/develop/docs/getting_started.org#package-management][package!]] please
+;; open a pull request.
+
+;; *** Spacemacs
+
+;; If you know how to install a package from Spacemacs please open a pull
+;; request.
+
+;; ** Usage
+
+;; After installing it for the first time you'll need to run the setup function
+;; once:
+
+;; #+begin_src text
+;; M-x emacs-audit-setup RET
+;; #+end_src
+
+;; After that, run
+
+;; #+begin_src text
+;; M-x emacs-audit-list-packages RET
+;; #+end_src
+
+;; to see the the package list buffer. The package list buffer mode inherits
+;; from =tablist-mode= so you can use commands from both tablist and
+;; tabulated-list modes, most importantly:
+
+;; - =tablist-forward-column=
+;; - =tablist-backward-column=
+
+;; to move around and
+
+;; - =tabulated-list-narrow-current-column=
+;; - =tabulated-list-widen-current-column=
+;; - =tablist-sort=
+
+;; to interact with the buffer.
+
+;; ** Configuration
+
+;; *** Buffer opening behavior
+
+;; The buffer listing packages is relatively wide so I recommend you set a
+;; [[https://www.gnu.org/software/emacs/manual/html_node/elisp/The-Zen-of-Buffer-Display.html][~display-buffer-alist~]] entry for opening a full-width, half-height window in
+;; your current frame for it. This also achieves a consistent open behavior for
+;; this buffer.
+
+;; #+begin_src emacs-lisp
+;; (add-to-list 'display-buffer-alist '("\\*emacs-audit: package-list\\*"
+;;                                      (display-buffer-in-side-window)
+;;                                      (window-height . 0.5)
+;;                                      (window-width . 0.5)
+;;                                      (slot . 0)
+;;                                      (mode-line-format . (" " "%b"))))
+;; #+end_src
+
+;; Of course, you're free to configure this any way you want. Watch [[https://www.youtube.com/watch?v=rjOhJMbA-q0][this video]]
+;; if you're still not too familiar with ~display-buffer-alist~.
+
+;; *** Custom GitHub token
+
+;; =emacs-audit= fetches data from the GitHub GraphQL API, which requires a
+;; personal access token. The binaries provided in the [[https://github.com/mpereira/emacs-audit/releases][releases]] use a default
+;; token so _you don't need to configure this_.
+
+;; If for whatever reason you do want to to use a custom token, check out [[https://docs.github.com/en/graphql/guides/forming-calls-with-graphql#authenticating-with-graphql][the
+;; documentation]] for instructions on how to create one. Then add the following
+;; to your configuration:
+
+;; #+begin_src emacs-lisp
+;; (setq emacs-audit-github-token "SOME-TOKEN")
+;; #+end_src
+
+;; ** Development
+
+;; =emacs-audit= runs a Rust program to fetch data used to enrich local package
+;; information. =M-x emacs-audit-setup= downloads a platform-dependent,
+;; versioned binary from the GitHub releases.
+
+;; To work with a local clone of the =emacs-audit= git repository run =M-x
+;; emacs-audit-development-mode-toggle= so that =cargo run= is used instead of
+;; the downloaded binary.
+
+;; *** Sync =emacs-audit.el= [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Library-Headers.html][library header]] "commentary" section with =README.org=
+
+;; 1. Visit =elisp/emacs-audit.el=
+;; 2. Move point to over the line with the =* emacs-audit= commented out headline
+;; 3. Call =M-x mpereira/outorg-edit-as-org=
+;; 4. Paste relevant portions of =README.org= to the =*outorg-edit-buffer*= buffer
+;; 5. Switch to the =*outorg-edit-buffer*= buffer
+;; 6. Eval ~(setq-local org-adapt-indentation nil)~
+;; 7. Run =M-x mpereira/indent-buffer=
+;; 8. Save buffer
+;; 9. Run =M-x mpereira/outorg-copy-edits-and-exit=
+;; 10. Comment out uncommented Emacs Lisp blocks in the =elisp/emacs-audit.el=
+;;     buffer, enclose them in org source blocks, and fix incorrect
+;;     indentations
+
+;; ** License
+;; #+begin_src text
+;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
@@ -65,11 +211,16 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+;; #+end_src
 
-;;; Code:
+;; Change Log:
 
-;;;; Requirements
+;; TODO: changelog.
+
+;; Code:
+
+;; Requirements
 
 (require 'dash)
 (require 'elx)
@@ -98,7 +249,7 @@
 (defvar package-selected-packages nil
   "TODO: docstring.")
 
-;;;; Variables
+;; Variables
 
 (defvar emacs-audit-version "1.0.0-snapshot"
   "TODO: docstring.")
@@ -150,7 +301,7 @@
 (defvar emacs-audit--development-mode nil
   "TODO: docstring.")
 
-;;;; Options
+;; Options
 
 (defgroup emacs-audit nil
   "Settings for `emacs-audit'."
@@ -179,7 +330,7 @@
   :group 'emacs-audit
   :type 'string)
 
-;;;; Helper functions and macros
+;; Helper functions and macros
 
 (defun emacs-audit--get-platform ()
   "TODO: docstring."
@@ -454,7 +605,7 @@
       (json-pretty-print-buffer)
       (message "Wrote %s" path))))
 
-;;;; Commands
+;; Commands
 
 (defun emacs-audit-setup ()
   "TODO: docstring."
@@ -565,7 +716,7 @@
         (org-table-convert-region (point-min) (point-max) ";")
         (browse-url (org-html-export-to-html))))))
 
-;;;; Footer
+;; Footer
 
 (provide 'emacs-audit)
 
