@@ -280,15 +280,24 @@
                                           nil
                                         t)))
 
-(defun emacs-audit--command ()
-  "TODO: docstring."
-  (if emacs-audit--development-mode
-      (or emacs-audit--development-command
-          (message (concat "In development mode but "
-                           "`emacs-audit--development-command' "
-                           "isn't available. Development mode only works when "
-                           "inside an emacs-audit git repository")))
-    (emacs-audit--with-executable executable executable)))
+(defmacro emacs-audit--with-command (command &rest body)
+  "TODO: COMMAND BODY docstring."
+  `(if emacs-audit--development-mode
+       (if emacs-audit--development-command
+           (let ((,command emacs-audit--development-command))
+             (progn
+               ,@body))
+         (progn
+           (message (concat "In development mode but "
+                            "`emacs-audit--development-command' "
+                            "isn't available. Development mode only works when "
+                            "inside an emacs-audit git repository"))
+           nil))
+     (emacs-audit--with-executable
+      executable
+      (let ((,command (list executable)))
+        (progn
+          ,@body)))))
 
 (defun emacs-audit--parse-name-and-email-address (part-alist)
   "TODO: PART-ALIST docstring."
@@ -468,13 +477,14 @@
 (defun emacs-audit-list-packages-refresh ()
   "TODO: docstring."
   (interactive)
-  (let ((command (emacs-audit--command)))
-    (if (file-exists-p (emacs-audit--package-index-raw-file-path))
-        (emacs-audit--package-index-enrich command)
-      (progn
-        (message "Writing local package index to disk...")
-        (emacs-audit--package-index-dump)
-        (emacs-audit--package-index-enrich command)))))
+  (emacs-audit--with-command
+   command
+   (if (file-exists-p (emacs-audit--package-index-raw-file-path))
+       (emacs-audit--package-index-enrich command)
+     (progn
+       (message "Writing local package index to disk...")
+       (emacs-audit--package-index-dump)
+       (emacs-audit--package-index-enrich command)))))
 
 (defun emacs-audit-list-packages (arg)
   "TODO: ARG docstring."
