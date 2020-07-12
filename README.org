@@ -2,7 +2,7 @@
 
   Show rich information about your Emacs setup.
 
-[[resources/emacs_audit_demo.gif][file:resources/emacs_audit_demo.gif]]
+  [[resources/emacs_audit_demo.gif][file:resources/emacs_audit_demo.gif]]
 
 ** Features
 
@@ -19,6 +19,11 @@
        - Pull requests
        - Vulnerability alerts
    - ... and more to come
+
+** Supported platforms
+
+   - macOS
+   - Linux
 
 ** Install
 
@@ -172,18 +177,12 @@
 
 *** Sync =emacs-audit.el= [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Library-Headers.html][library header]] "commentary" section with =README.org=
 
-    1. Visit =elisp/emacs-audit.el=
-    2. Move point to over the line with the =* emacs-audit= commented out headline
-    3. Call =M-x mpereira/outorg-edit-as-org=
-    4. Paste relevant portions of =README.org= to the =*outorg-edit-buffer*= buffer
-    5. Switch to the =*outorg-edit-buffer*= buffer
-    6. Eval ~(setq-local org-adapt-indentation nil)~
-    7. Run =M-x mpereira/indent-buffer=
-    8. Save buffer
-    9. Run =M-x mpereira/outorg-copy-edits-and-exit=
-    10. Comment out uncommented Emacs Lisp blocks in the =elisp/emacs-audit.el=
-        buffer, enclose them in org source blocks, and fix incorrect
-        indentations
+    1. Visit =README.org=
+    2. Call =M-x org-export-dispatch RET t U= to export to a UTF-8 text buffer
+    3. Run =M-x mpereira/indent-buffer=
+    4. Prepend an Emacs Lisp comment (;;) to all lines
+    5. Copy and paste org export buffer contents to =emacs-audit.el=
+    6. Run =M-x delete-trailing-whitespace=, save the buffer
 
 ** License
    #+begin_src text
@@ -200,3 +199,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <https://www.gnu.org/licenses/>.
    #+end_src
+
+# Local Variables:
+# org-export-with-broken-links: t
+# org-export-with-author: nil
+# End:
