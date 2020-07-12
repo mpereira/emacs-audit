@@ -62,7 +62,7 @@ jobs:
 
       - name: Set $EMACS_AUDIT_VERSION
         run: >
-          echo ::set-env name=EMACS_AUDIT_VERSION::$(${{ env.EMACS_AUDIT }} --version | cut -f2 -d" ")
+          echo ::set-env name=EMACS_AUDIT_VERSION::$(${{ env.EMACS_AUDIT }} --version | cut -f2 -d' ')
 
       - name: Set emacs_audit_version output
         id: emacs_audit_version
@@ -92,8 +92,23 @@ jobs:
           name: release-artifacts
           path: ${{ env.EMACS_AUDIT_ARCHIVE }}
 
-  update-tag:
+  upload-elisp:
     needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        name: Check out repository
+        with:
+          fetch-depth: 1
+
+      - name: Upload emacs-audit.el to release artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: release-artifacts
+          path: elisp/emacs-audit.el
+
+  update-tag:
+    needs: [build, upload-elisp]
     runs-on: ubuntu-latest
     steps:
       - name: Update snapshot release tag
@@ -104,7 +119,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   update-release:
-    needs: [build]
+    needs: [build, upload-elisp, update-tag]
     name: Update release (${{ needs.build.outputs.emacs_audit_version }})
     runs-on: ubuntu-latest
     steps:
